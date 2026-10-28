@@ -1,0 +1,5 @@
+.env
+media
+loadtest/tokens.json
+**/__pycache__
+.pytest_cache

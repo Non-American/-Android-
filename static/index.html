@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Orbita — знакомства по смыслу интересов</title>
+<meta name="theme-color" content="#0d0d0d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="topbar">
+  <span id="tbLeft">Бесплатно · только подтверждённые анкеты</span>
+  <nav id="tbRight"></nav>
+</div>
+<header class="hdr" id="hdr">
+  <nav class="hdr-l" id="navL" aria-label="Разделы"></nav>
+  <a class="logo" href="#/">ORBITA</a>
+  <nav class="hdr-r" id="navR" aria-label="Аккаунт"></nav>
+</header>
+<div class="vbar" id="vbar" hidden></div>
+<main id="view" tabindex="-1"></main>
+<nav class="tabbar" id="tabbar" aria-label="Навигация"></nav>
+
+<dialog id="authDlg" aria-labelledby="authTitle">
+  <form class="dlg" id="authForm" novalidate>
+    <button class="x" type="button" data-close aria-label="Закрыть">×</button>
+    <h2 id="authTitle">Вход</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="login" role="tab">Вход</button>
+      <button type="button" data-tab="register" role="tab">Регистрация</button>
+    </div>
+    <div class="field"><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="aPw">Пароль</label><input id="aPw" type="password" minlength="8" required autocomplete="current-password"></div>
+    <div class="field reg"><label for="aName">Имя</label><input id="aName" maxlength="50" autocomplete="given-name"></div>
+    <div class="field reg"><label for="aAge">Возраст</label><input id="aAge" type="number" min="18" max="99" inputmode="numeric"></div>
+    <p class="hint reg">Только 18+. После регистрации придёт письмо для подтверждения email.</p>
+    <button class="btn" type="submit" id="aSubmit">Войти</button>
+    <p class="err" id="aErr" role="alert"></p>
+  </form>
+</dialog>
+
+<dialog id="repDlg" aria-labelledby="repTitle">
+  <form class="dlg" id="repForm">
+    <button class="x" type="button" data-close aria-label="Закрыть">×</button>
+    <h2 id="repTitle">Жалоба</h2>
+    <p class="hint" id="repWho"></p>
+    <div class="radios">
+      <label><input type="radio" name="reason" value="spam" required> Спам или реклама</label>
+      <label><input type="radio" name="reason" value="fake"> Фейковая анкета</label>
+      <label><input type="radio" name="reason" value="abuse"> Оскорбления или угрозы</label>
+      <label><input type="radio" name="reason" value="inappropriate_photo"> Неприемлемые фото</label>
+      <label><input type="radio" name="reason" value="underage"> Похоже, младше 18 лет</label>
+      <label><input type="radio" name="reason" value="other"> Другое</label>
+    </div>
+    <div class="field"><label for="repText">Комментарий</label><textarea id="repText" rows="3" maxlength="1000"></textarea></div>
+    <p class="hint">Пользователь будет заблокирован для вас сразу, жалобу рассмотрит модератор.</p>
+    <button class="btn" type="submit">Отправить жалобу</button>
+    <p class="err" id="repErr" role="alert"></p>
+  </form>
+</dialog>
+
+<div class="matchov" id="matchOv" hidden role="dialog" aria-modal="true" aria-label="Взаимная симпатия"></div>
+<div id="toast" hidden role="status" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>

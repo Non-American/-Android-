@@ -1,0 +1,127 @@
+x-app: &app
+  build: .
+  image: orbita-api
+  environment: &env
+    DATABASE_URL: postgresql://postgres:orbita@pgbouncer:5432/orbita
+    PGBOUNCER: "true"
+    DB_POOL_MAX: "10"
+    REDIS_URL: redis://redis:6379/0
+    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8000}
+    SMTP_HOST: ${SMTP_HOST:-mailpit}
+    SMTP_PORT: ${SMTP_PORT:-1025}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+    EMBEDDINGS: remote
+    EMBEDDER_URL: http://embedder:8001
+    MEDIA_DIR: /data/media
+    TRUST_PROXY: "true"
+    WEB_CONCURRENCY: "4"
+  volumes: ["media:/data/media"]
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment: {POSTGRES_PASSWORD: orbita, POSTGRES_DB: orbita}
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_compression=on
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+    shm_size: 1g
+    volumes: ["pg:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 3s, retries: 20}
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.23.1-p3
+    environment:
+      DATABASE_URL: postgresql://postgres:orbita@db:5432/orbita
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "5000"
+      DEFAULT_POOL_SIZE: "60"
+      MAX_DB_CONNECTIONS: "150"
+    depends_on: {db: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432"], interval: 3s, retries: 20}
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "512mb",
+              "--maxmemory-policy", "allkeys-lru", "--maxclients", "20000"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 3s, retries: 20}
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports: ["8025:8025"]
+
+  embedder:
+    <<: *app
+    command: ["uvicorn", "app.embedder:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
+    environment:
+      <<: *env
+      EMBEDDINGS: auto
+    volumes: []
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8001/health')"],
+                  interval: 5s, retries: 40, start_period: 30s}
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *env
+      DATABASE_URL: postgresql://postgres:orbita@db:5432/orbita
+      PGBOUNCER: "false"
+    depends_on: {db: {condition: service_healthy}}
+
+  api:
+    <<: *app
+    deploy: {replicas: 2}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      embedder: {condition: service_healthy}
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"],
+                  interval: 5s, retries: 30, start_period: 10s}
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["8000:80"]
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/srv/static:ro
+      - media:/data/media:ro
+    ulimits: {nofile: 65535}
+    depends_on: {api: {condition: service_healthy}}
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ["loadtest"]
+    environment: {BASE_URL: "http://nginx"}
+    volumes: ["./loadtest:/scripts:ro"]
+    command: ["run", "/scripts/k6.js"]
+    depends_on: {nginx: {condition: service_started}}
+
+volumes: {pg: {}, media: {}}
